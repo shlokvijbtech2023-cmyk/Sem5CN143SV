@@ -23,7 +23,7 @@ int main() {
 
     // Bind socket
     address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY; // Listen on all local interfaces
+    address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(PORT);
 
     if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
@@ -31,37 +31,47 @@ int main() {
         exit(1);
     }
 
-    // Listen for client connections
+    // Listen
     if (listen(server_fd, 3) < 0) {
         perror("Listen failed");
         exit(1);
     }
-    printf("📡 Server is listening on port %d...\n", PORT);
+    printf("Server listening on port %d...\n", PORT);
 
-    // Accept client connection
+    // Accept connection
     new_socket = accept(server_fd, (struct sockaddr*)&address, (socklen_t*)&addrlen);
     if (new_socket < 0) {
         perror("Accept failed");
         exit(1);
     }
-    printf("Client connected!\n\n");
+    printf("Client connected!\n");
 
-    // Open file to save incoming content
-    fp = fopen("received_lex.yy.c", "wb");
-    if (fp == NULL) {
+    // Receive file name first
+    char filename[256];
+    int name_len = recv(new_socket, filename, sizeof(filename), 0);
+    if (name_len <= 0) {
+        perror("Failed to receive filename");
+        exit(1);
+    }
+    filename[name_len] = '\0';
+    printf("Receiving file: %s\n", filename);
+
+    // Open file for writing
+    fp = fopen(filename, "wb");
+    if (!fp) {
         perror("File open failed");
         exit(1);
     }
 
-    // Receive data
+    // Receive and write file content
     ssize_t bytes;
     while ((bytes = recv(new_socket, buffer, BUFFER_SIZE, 0)) > 0) {
-        fwrite(buffer, 1, bytes, fp); // Save to file
-        buffer[bytes] = '\0';         // Null-terminate for printing
-        printf("%s", buffer);         // Print to console
+        fwrite(buffer, 1, bytes, fp);
+        buffer[bytes] = '\0';
+        printf("%s", buffer); // Live print
     }
 
-    printf("\n\nFile received successfully and saved as 'received_lex.yy.c'\n");
+    printf("\n\nFile '%s' received successfully.\n", filename);
 
     fclose(fp);
     close(new_socket);
